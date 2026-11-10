@@ -1,0 +1,94 @@
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f2f5f9;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #234c80;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+}
+
+h2 {
+    color: #234c80;
+    margin-top: 30px;
+}
+
+label {
+    display: block;
+    margin-top: 12px;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    box-sizing: border-box;
+}
+
+textarea {
+    height: 70px;
+}
+
+button {
+    background: #234c80;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    margin-top: 15px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+button:hover {
+    background: #16345b;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+th, td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+}
+
+th {
+    background: #234c80;
+    color: white;
+}
+
+.approve {
+    background: green;
+    margin: 3px;
+}
+
+.reject {
+    background: red;
+    margin: 3px;
+}
+
+@media (max-width: 700px) {
+    .container {
+        padding: 10px;
+        overflow-x: auto;
+    }
+
+    table {
+        min-width: 650px;
+    }
+}
+

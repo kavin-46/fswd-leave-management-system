@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leave Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>Leave Management System</h1>
+
+    <div class="container">
+
+        <h2>Student Leave Application</h2>
+
+        <form id="leaveForm">
+
+            <label>Student Name</label>
+            <input type="text" id="studentName" required>
+
+            <label>Leave Type</label>
+            <select id="leaveType">
+                <option value="Casual Leave">Casual Leave</option>
+                <option value="Medical Leave">Medical Leave</option>
+            </select>
+
+            <label>From Date</label>
+            <input type="date" id="fromDate" required>
+
+            <label>To Date</label>
+            <input type="date" id="toDate" required>
+
+            <label>Reason</label>
+            <textarea id="reason" required></textarea>
+
+            <button type="submit">Apply for Leave</button>
+
+        </form>
+
+        <h3>Available Leave Days</h3>
+        <p>Casual Leave: <span id="casualDays">12</span></p>
+        <p>Medical Leave: <span id="medicalDays">10</span></p>
+
+        <h2>My Leave Requests</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Days</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody id="studentLeaves"></tbody>
+        </table>
+
+        <h2>Teacher Dashboard</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Type</th>
+                    <th>Dates</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody id="teacherLeaves"></tbody>
+        </table>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
+
