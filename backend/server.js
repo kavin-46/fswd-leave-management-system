@@ -1,164 +1,305 @@
-
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require("dotenv").config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.log(err));
+// MongoDB Connection
+require("dotenv").config();
 
-const leaveSchema = new mongoose.Schema({
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("MongoDB Atlas Connected"))
+    .catch((error) => console.log("MongoDB Connection Error:", error));
+
+
+// Student Schema
+const Student = mongoose.model("Student", {
+    name: String,
+    email: String,
+    password: String,
+    studentId: { type: String, unique: true },
+    casualLeave: { type: Number, default: 10 },
+    medicalLeave: { type: Number, default: 10 }
+});
+
+// Leave Schema
+const Leave = mongoose.model("Leave", {
+    studentId: String,
     studentName: String,
     leaveType: String,
     fromDate: String,
     toDate: String,
     days: Number,
     reason: String,
-    status: {
-        type: String,
-        default: "Pending"
+    status: { type: String, default: "Pending" }
+});
+
+// Student Registration
+app.post("/register", async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        if (!name || !email || !password || password.length < 6) {
+            return res.status(400).json({
+                message: "Enter all details. Password must have 6 characters."
+            });
+        }
+
+        const existing = await Student.findOne({ email });
+
+        if (existing) {
+            return res.status(400).json({
+                message: "Email already registered"
+            });
+        }
+
+        const studentId = "STU" + Date.now();
+
+        const student = new Student({
+            name,
+            email,
+            password,
+            studentId
+        });
+
+        await student.save();
+
+        res.json({
+            message: "Registration Successful",
+            studentId
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: "Registration Failed" });
     }
 });
 
-const Leave = mongoose.model("Leave", leaveSchema);
-
-const balances = {
-    "Casual Leave": 12,
-    "Medical Leave": 10
-};
-
-app.get("/", (req, res) => {
-    res.send("Leave Management System Backend Running");
-});
-
-app.get("/leaves", async (req, res) => {
-    const leaves = await Leave.find();
-    res.json(leaves);
-});
-
-app.post("/leaves", async (req, res) => {
+// Student Login
+app.post("/student-login", async (req, res) => {
     try {
-        const { studentName, leaveType, fromDate, toDate, reason } = req.body;
+        const student = await Student.findOne({
+            studentId: req.body.studentId,
+            password: req.body.password
+        });
 
-        if (!studentName || !leaveType || !fromDate || !toDate || !reason) {
-            return res.status(400).json({ message: "Fill all fields" });
+        if (!student) {
+            return res.status(401).json({
+                message: "Invalid Student ID or Password"
+            });
         }
 
-        const start = new Date(fromDate);
-        const end = new Date(toDate);
+        res.json({
+            message: "Login Successful",
+            student
+        });
 
-        if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
-            return res.status(400).json({ message: "Invalid leave dates" });
+    } catch (error) {
+        res.status(500).json({ message: "Login Failed" });
+    }
+});
+
+// Teacher Login
+app.post("/teacher-login", (req, res) => {
+
+    if (
+        req.body.teacherId === "ITSTAFF001" &&
+        req.body.password === "12345"
+    ) {
+        res.json({
+            message: "Login Successful"
+        });
+    } else {
+        res.status(401).json({
+            message: "Invalid Teacher Login"
+        });
+    }
+});
+
+// Apply Leave
+app.post("/apply-leave", async (req, res) => {
+    try {
+        const {
+            studentId,
+            leaveType,
+            fromDate,
+            toDate,
+            reason
+        } = req.body;
+
+        const student = await Student.findOne({ studentId });
+
+        if (!student) {
+            return res.status(404).json({
+                message: "Student Not Found"
+            });
         }
 
-        const days = Math.floor((end - start) / 86400000) + 1;
+        if (!["Casual", "Medical"].includes(leaveType)) {
+            return res.status(400).json({
+                message: "Invalid Leave Type"
+            });
+        }
+
+        const start = new Date(fromDate + "T00:00:00");
+        const end = new Date(toDate + "T00:00:00");
+
+        if (!fromDate || !toDate || isNaN(start) ||
+            isNaN(end) || end < start || !reason || !reason.trim()) {
+            return res.status(400).json({
+                message: "Enter valid leave details"
+            });
+        }
+
+        const days = Math.round(
+            (end - start) / (1000 * 60 * 60 * 24)
+        ) + 1;
+
+        const balance = leaveType === "Casual"
+            ? student.casualLeave
+            : student.medicalLeave;
+
+        if (days > balance) {
+            return res.status(400).json({
+                message: "Insufficient Leave Balance"
+            });
+        }
+
+        const overlap = await Leave.findOne({
+            studentId,
+            status: { $in: ["Pending", "Approved"] },
+            fromDate: { $lte: toDate },
+            toDate: { $gte: fromDate }
+        });
+
+        if (overlap) {
+            return res.status(400).json({
+                message: "Leave already applied for these dates"
+            });
+        }
 
         const leave = new Leave({
-            studentName,
+            studentId,
+            studentName: student.name,
             leaveType,
             fromDate,
             toDate,
             days,
-            reason
+            reason: reason.trim()
         });
 
         await leave.save();
 
-        res.status(201).json({
-            message: "Leave application submitted",
-            leave
+        res.json({
+            message: "Leave Applied Successfully"
         });
+
     } catch (error) {
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Leave Application Failed" });
     }
 });
 
-app.patch("/leaves/:id", async (req, res) => {
+// Student Dashboard
+app.get("/student/:id", async (req, res) => {
+    try {
+        const student = await Student.findOne({
+            studentId: req.params.id
+        }).select("-password");
+
+        if (!student) {
+            return res.status(404).json({
+                message: "Student Not Found"
+            });
+        }
+
+        const leaves = await Leave.find({
+            studentId: req.params.id
+        });
+
+        res.json({ student, leaves });
+
+    } catch (error) {
+        res.status(500).json({ message: "Unable to Load Details" });
+    }
+});
+
+// Teacher View All Leaves
+app.get("/all-leaves", async (req, res) => {
+    try {
+        const leaves = await Leave.find().sort({ _id: -1 });
+        res.json(leaves);
+    } catch (error) {
+        res.status(500).json({ message: "Unable to Load Applications" });
+    }
+});
+
+// Teacher Approve or Reject
+app.post("/update-leave/:id", async (req, res) => {
     try {
         const { status } = req.body;
 
         if (!["Approved", "Rejected"].includes(status)) {
-            return res.status(400).json({ message: "Invalid status" });
+            return res.status(400).json({
+                message: "Invalid Status"
+            });
         }
 
         const leave = await Leave.findById(req.params.id);
 
-        if (!leave) {
-            return res.status(404).json({ message: "Leave not found" });
-        }
-
-        if (leave.status !== "Pending") {
-            return res.status(400).json({ message: "Request already reviewed" });
+        if (!leave || leave.status !== "Pending") {
+            return res.status(400).json({
+                message: "Application Not Available"
+            });
         }
 
         if (status === "Approved") {
-            const usedDays = await Leave.aggregate([
-                {
-                    $match: {
-                        studentName: leave.studentName,
-                        leaveType: leave.leaveType,
-                        status: "Approved"
-                    }
-                },
-                {
-                    $group: {
-                        _id: null,
-                        total: { $sum: "$days" }
-                    }
-                }
-            ]);
 
-            const used = usedDays.length ? usedDays[0].total : 0;
-            const available = balances[leave.leaveType] - used;
+            const student = await Student.findOne({
+                studentId: leave.studentId
+            });
 
-            if (leave.days > available) {
-                return res.status(400).json({
-                    message: "Insufficient leave balance"
+            if (!student) {
+                return res.status(404).json({
+                    message: "Student Not Found"
                 });
             }
+
+            const balance = leave.leaveType === "Casual"
+                ? student.casualLeave
+                : student.medicalLeave;
+
+            if (leave.days > balance) {
+                return res.status(400).json({
+                    message: "Insufficient Leave Balance"
+                });
+            }
+
+            if (leave.leaveType === "Casual") {
+                student.casualLeave -= leave.days;
+            } else {
+                student.medicalLeave -= leave.days;
+            }
+
+            await student.save();
         }
 
         leave.status = status;
         await leave.save();
 
         res.json({
-            message: "Leave " + status.toLowerCase(),
-            leave
+            message: "Leave " + status + " Successfully"
         });
+
     } catch (error) {
-        res.status(500).json({ message: "Server error" });
+        res.status(500).json({ message: "Update Failed" });
     }
 });
 
-app.get("/balance/:studentName", async (req, res) => {
-    try {
-        const leaves = await Leave.find({
-            studentName: req.params.studentName,
-            status: "Approved"
-        });
-
-        const result = {
-            "Casual Leave": balances["Casual Leave"],
-            "Medical Leave": balances["Medical Leave"]
-        };
-
-        leaves.forEach(leave => {
-            result[leave.leaveType] -= leave.days;
-        });
-
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ message: "Server error" });
-    }
+// Start Server
+mongoose.connection.once("open", () => {
+    app.listen(5000, () => {
+        console.log("Server running on port 5000");
+    });
 });
-
-app.listen(process.env.PORT || 5000, () => {
-    console.log("Server running on port 5000");
-});
-
